@@ -3360,6 +3360,19 @@ struct to_ir {
         auto kwargs = emitAttributes(apply.attributes());
         return emitAwaitableExpr(apply.range(), awaited, args, kwargs);
       }
+      case prim::awaitable_then: {
+        auto tree = apply.inputs().tree();
+        if (!tree || tree->trees().size() != 2) {
+          throw ErrorReport(apply)
+              << "Expected exactly two arguments to awaitable_then()";
+        }
+        auto& trees = tree->trees();
+        auto await_then = emitSugaredExpr(Expr(trees[0]), 1);
+        TreeList sliced_trees(trees.begin() + 1, trees.end());
+        auto args = getNamedValues(sliced_trees, true);
+        auto kwargs = emitAttributes(apply.attributes());
+        return emitAwaitableThenExpr(apply.range(), await_then, args, kwargs);
+      }
       case prim::annotate: {
         checkApplyNumInputs(apply, 2);
         TypePtr type = typeParser_.parseTypeFromExpr(apply.inputs()[0]);
@@ -4168,6 +4181,36 @@ struct to_ir {
     }
     Value* node_output =
         await_node->output()->setType(AwaitType::create(out_type));
+    return std::make_shared<SimpleValue>(node_output);
+  }
+
+  std::shared_ptr<SugaredValue> emitAwaitableThenExpr(
+      SourceRange loc,
+      const std::shared_ptr<SugaredValue>& await_then,
+      at::ArrayRef<NamedValue> args,
+      at::ArrayRef<NamedValue> kwargs) {
+    auto g = method.graph();
+    auto await_then_node =
+        g->insertNode(method.graph()->create(prim::awaitableClosure, 1))
+            ->setSourceRange(loc);
+    {
+      WithInsertPoint insert(await_then_node);
+      if (auto sv = dynamic_cast<ClosureValue*>(await_then.get())) {
+        Value* closure_output = sv->asValue(loc, method);
+        Block* closure_block = closure_output->node()->blocks().at(0);
+        TORCH_INTERNAL_ASSERT(closure_block->outputs().size() == 1);
+        await_then_node->addInput(closure_output);
+      } else {
+        auto emit_closure_body = [&](Block* closure_block) {
+          auto fn_sugared_output = await_then->call(loc, method, args, kwargs, 1);
+          auto fn_simple_output = fn_sugared_output->asValue(loc, method);
+          closure_block->registerOutput(fn_simple_output);
+        };
+        auto closure_value = emitClosure(emit_closure_body);
+        await_then_node->addInput(closure_value->asValue(loc, method));
+      }
+    }
+    Value* node_output = await_then_node->output();
     return std::make_shared<SimpleValue>(node_output);
   }
 
