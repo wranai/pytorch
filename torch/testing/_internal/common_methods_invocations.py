@@ -14892,7 +14892,7 @@ op_db: List[OpInfo] = [
                # AssertionError: None mismatch: 1.0 is not None
                DecorateInfo(unittest.expectedFailure, 'TestCompositeCompliance', 'test_backward'),
                # AssertionError: Tensor-likes are not equal! Flaky
-               DecorateInfo(unittest.skip("Skipped!"), 'TestCommon', 'test_non_standard_bool_values', device_type="cuda"),
+               DecorateInfo(unittest.skip("Skipped!"), 'TestCommon', 'test_non_standard_bool_values'),
                # AssertionError: None mismatch: None is not (0.05548311024904251+0.5575037002563477j)
                # Got different gradients for contiguous / non-contiguous inputs wrt input 1.
                DecorateInfo(
@@ -14916,7 +14916,7 @@ op_db: List[OpInfo] = [
            skips=(
                # https://github.com/pytorch/pytorch/pull/91534
                # AssertionError: Tensor-likes are not equal! Flaky
-               DecorateInfo(unittest.skip("Skipped!"), 'TestCommon', 'test_non_standard_bool_values', device_type="cpu"),
+               DecorateInfo(unittest.skip("Skipped!"), 'TestCommon', 'test_non_standard_bool_values'),
            ),
            gradcheck_nondet_tol=GRADCHECK_NONDET_TOL),
     OpInfo('index_select',
@@ -14929,6 +14929,9 @@ op_db: List[OpInfo] = [
            supports_forward_ad=True,
            supports_fwgrad_bwgrad=True,
            skips=(
+               # https://github.com/pytorch/pytorch/pull/91534
+               # AssertionError: Tensor-likes are not equal! Flaky
+               DecorateInfo(unittest.skip("Skipped!"), 'TestCommon', 'test_non_standard_bool_values'),
            ),
            assert_jit_shape_analysis=True,
            gradcheck_nondet_tol=GRADCHECK_NONDET_TOL),
@@ -14988,6 +14991,9 @@ op_db: List[OpInfo] = [
            sample_inputs_func=sample_inputs_index_put,
            skips=(
                DecorateInfo(unittest.expectedFailure, 'TestNormalizeOperators', 'test_normalize_operator_exhaustive'),
+               # https://github.com/pytorch/pytorch/pull/91534
+               # AssertionError: Tensor-likes are not equal! Flaky
+               DecorateInfo(unittest.skip("Skipped!"), 'TestCommon', 'test_non_standard_bool_values'),
            )),
     OpInfo('sort',
            dtypes=all_types_and(torch.bool, torch.float16, torch.bfloat16),
