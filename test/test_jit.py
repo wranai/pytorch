@@ -2066,7 +2066,7 @@ graph(%Ra, %Rb):
     def test_sparse_tensors(self):
         @torch.jit.ignore
         def get_sparse():
-            return torch.sparse.FloatTensor(2, 3)
+            return torch.empty((2, 3), dtype=torch.float32, layout=torch.sparse_coo)
 
         @torch.jit.script
         def test_is_sparse(input):
