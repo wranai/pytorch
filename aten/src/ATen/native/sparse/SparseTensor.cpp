@@ -46,6 +46,7 @@
 #include <ATen/ops/empty.h>
 #include <ATen/ops/empty_like_native.h>
 #include <ATen/ops/empty_native.h>
+#include <ATen/ops/zeros_like.h>
 #include <ATen/ops/index_select.h>
 #include <ATen/ops/indices_native.h>
 #include <ATen/ops/is_coalesced_native.h>
@@ -744,6 +745,7 @@ SparseTensor _coalesce_sparse_cpu(const SparseTensor& self) {
 }
 
 DEFINE_DISPATCH(sparse_mask_intersection_out_stub);
+DEFINE_DISPATCH(sparse_mask_projection_out_stub);
 
 SparseTensor sparse_mask(const Tensor& t, const SparseTensor& mask) {
   TORCH_CHECK(
@@ -753,11 +755,15 @@ SparseTensor sparse_mask(const Tensor& t, const SparseTensor& mask) {
       " but mask has size ",
       mask.sizes());
 
-  if (!mask.numel()) {
+  if (!t.numel() || !mask.numel() || !mask._nnz()) {
     return mask.clone().to(t.device(), t.scalar_type());
   }
 
   if (t.layout() == at::kSparse) {
+    if (!t._nnz()) {
+      return at::zeros_like(mask, t.options());
+    }
+
     TORCH_CHECK(t.sparse_dim() == mask.sparse_dim(),
                 "sparse_mask(): the number of sparse dimensions in `self` ",
                 "should match that of the `mask`. ",
@@ -804,7 +810,11 @@ SparseTensor sparse_mask(const Tensor& t, const SparseTensor& mask) {
     const auto rhs = mask.is_coalesced() ? wrapped_tensor(mask) : mask;
 
     auto res = at::empty({0}, t.options());
-    sparse_mask_intersection_out_stub(res.device().type(), res, lhs, rhs, lhs_hash_opt);
+    if (true) {
+      sparse_mask_intersection_out_stub(res.device().type(), res, lhs, rhs, lhs_hash_opt);
+    } else {
+      sparse_mask_projection_out_stub(res.device().type(), res, lhs, rhs, lhs_hash_opt);
+    }
     return res._coalesced_(mask.is_coalesced());
   }
 
@@ -814,6 +824,18 @@ SparseTensor sparse_mask(const Tensor& t, const SparseTensor& mask) {
       at::ones({1}, mask_values.options()).expand_as(mask_values),
       mask.sizes())._coalesced_(mask.is_coalesced());
   return t.mul(mask_template).to(t.scalar_type());
+}
+
+Tensor sparse_mask_projection(const Tensor& t, const Tensor& mask) {
+  TORCH_CHECK(
+      mask.sizes().equals(t.sizes()),
+      "sparse_mask(): operands have incompatible sizes; self has size ",
+      t.sizes(),
+      " but mask has size ",
+      mask.sizes());
+  auto res = at::empty({0}, t.options());
+  sparse_mask_projection_out_stub(res.device().type(), res, t, t, t);
+  return res;
 }
 
 Tensor empty_like_sparse_coo(
