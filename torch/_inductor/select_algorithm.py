@@ -118,7 +118,8 @@ class TritonTemplateKernel(TritonKernel):
         for name, input_node in zip(argnames, named_args):
             arg_name = f"arg_{name}"
             self.named_input_nodes[name] = input_node
-            self.args.input_buffers[input_node.get_name()] = arg_name
+            if arg_name not in self.args.input_buffers[input_node.get_name()]:
+                self.args.input_buffers[input_node.get_name()].append(arg_name)
             if input_node.get_layout().offset == 0:
                 renames.writeline(f"{name} = {arg_name}")
             else:
@@ -602,7 +603,7 @@ class AlgorithmSelectorCache(DiskCache):
 
         counters["inductor"]["select_algorithm_autotune"] += 1
         key = [x.hash_key() for x in choices] + [self.key_of(x) for x in input_nodes]
-        return choices[self.lookup(key, autotune)].output_node()
+        return choices[self.lookup(key, autotune) or 0].output_node()
 
     @classmethod
     def make_benchmark_fn(

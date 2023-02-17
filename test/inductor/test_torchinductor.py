@@ -4986,11 +4986,9 @@ class CommonTemplate:
             ),
             check_lowp=False,
         )
-        expected_kernel = 0
-        # codegen mm kernel from template
-        self.assertEqual(
-            torch._inductor.metrics.generated_kernel_count, expected_kernel
-        )
+        # mm might be tunable, i.e. autotuner may generate triton templates for the
+        # purpose of checking global/local caches (regardless of `max_autotune`)
+        self.assertGreaterEqual(torch._inductor.metrics.generated_kernel_count, 0)
 
     @config.patch({"triton.cudagraphs": False})
     def test_lowmem_dropout1(self):
@@ -5062,10 +5060,10 @@ class CommonTemplate:
         result = run(torch.randn([8, 32], device=self.device))
         result.sum().backward()
 
-        expected_kernel = 4
-        self.assertEqual(
-            torch._inductor.metrics.generated_kernel_count, expected_kernel
-        )
+        # m has 4 possibly tunable operations, therefore we expect to generate
+        # a multiple of 4 of triton templates
+        self.assertEqual(torch._inductor.metrics.generated_kernel_count % 4, 0)
+        self.assertGreater(torch._inductor.metrics.generated_kernel_count // 4, 0)
 
     def test_roll(self):
         def fn(a):

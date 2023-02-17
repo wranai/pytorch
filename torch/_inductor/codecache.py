@@ -98,6 +98,8 @@ class DiskCache:
         """
         path = os.path.join(self._subdir(), code_hash(self.unique_name + repr(key)))
         if not os.path.exists(path):
+            if not config.max_autotune:
+                return None
             value = generate()
             write_atomic(path, json.dumps(value))
         return self._read_file(path)
